@@ -140,7 +140,7 @@ int WebRtcNs_InitCore(NoiseSuppressionC* self, uint32_t fs) {
   self->aggrMode = 0;
 
   // Initialize variables for new method.
-  self->priorSpeechProb = 0.5f;  // Prior prob for speech/noise.
+  self->priorSpeechProb = 0.5f;  // Prior prob for speech/noise. Default: 0.5f
   // Previous analyze mag spectrum.
   memset(self->magnPrevAnalyze, 0, sizeof(float) * HALF_ANAL_BLOCKL);
   // Previous process mag spectrum.
@@ -907,15 +907,18 @@ static void FFT(NoiseSuppressionC* self,
 
   imag[0] = 0;
   real[0] = time_data[0];
-  magn[0] = fabsf(real[0]) + 1.f;
+  //magn[0] = fabsf(real[0]) + 1.f;
+  magn[0] = time_data[0] * time_data[0];
   imag[magnitude_length - 1] = 0;
   real[magnitude_length - 1] = time_data[1];
-  magn[magnitude_length - 1] = fabsf(real[magnitude_length - 1]) + 1.f;
+  //magn[magnitude_length - 1] = fabsf(real[magnitude_length - 1]) + 1.f;
+  magn[magnitude_length - 1] = time_data[1] * time_data[1];
   for (i = 1; i < magnitude_length - 1; ++i) {
     real[i] = time_data[2 * i];
     imag[i] = time_data[2 * i + 1];
     // Magnitude spectrum.
-    magn[i] = sqrtf(real[i] * real[i] + imag[i] * imag[i]) + 1.f;
+    //magn[i] = sqrtf(real[i] * real[i] + imag[i] * imag[i]) + 1.f;
+    magn[i] = (real[i] * real[i] + imag[i] * imag[i]);
   }
 }
 
@@ -1024,7 +1027,7 @@ int WebRtcNs_set_policy_core(NoiseSuppressionC* self, int mode) {
   if (mode < 0 || mode > 3) {
     return (-1);
   }
-
+  self->gainTimeDomainHB_ = 0;
   self->aggrMode = mode;
   if (mode == 0) {
     self->overdrive = 1.f;
@@ -1312,8 +1315,8 @@ void WebRtcNs_ProcessCore(NoiseSuppressionC* self,
     }
 
     self->smooth[i] = theFilter[i];
-    real[i] *= self->smooth[i];
-    imag[i] *= self->smooth[i];
+    //real[i] *= self->smooth[i];
+    //imag[i] *= self->smooth[i];
   }
   // Keep track of |magn| spectrum for next frame.
   memcpy(self->magnPrevProcess, magn, sizeof(*magn) * self->magnLen);
@@ -1406,19 +1409,21 @@ void WebRtcNs_ProcessCore(NoiseSuppressionC* self,
     gainTimeDomainHB = gainTimeDomainHB * decayBweHB;
     // Make sure gain is within flooring range.
     // Flooring bottom.
-    if (gainTimeDomainHB < self->denoiseBound) {
-      gainTimeDomainHB = self->denoiseBound;
+    if (gainTimeDomainHB < 0.8f) {
+        self->gainTimeDomainHB_ = 0.8f * 0.1259f + 0.2f * self->gainTimeDomainHB_;
     }
-    // Flooring top.
-    if (gainTimeDomainHB > 1.f) {
-      gainTimeDomainHB = 1.f;
+    else if (gainTimeDomainHB > 1.f) {
+      self->gainTimeDomainHB_ = 1.f;
+    }
+    else {
+        self->gainTimeDomainHB_ = gainTimeDomainHB;
     }
     // Apply gain.
     for (i = 0; i < num_high_bands; ++i) {
       for (j = 0; j < self->blockLen; j++) {
         outFrameHB[i][j] =
             WEBRTC_SPL_SAT(WEBRTC_SPL_WORD16_MAX,
-                           gainTimeDomainHB * self->dataBufHB[i][j],
+                           self->gainTimeDomainHB_ * self->dataBufHB[i][j],
                            WEBRTC_SPL_WORD16_MIN);
       }
     }

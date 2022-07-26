@@ -72,6 +72,7 @@ typedef struct NoiseSuppressionC_ {
   // Parameters for Wiener filter.
   float smooth[HALF_ANAL_BLOCKL];
   float overdrive;
+  float gainTimeDomainHB_;
   float denoiseBound;
   int gainmap;
   // FFT work arrays.

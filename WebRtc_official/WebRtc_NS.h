@@ -97,6 +97,7 @@ inline void WebRtc_NS::Process(float * _data_in, float * _data_out, size_t data_
 	for (size_t nFrames = 0; nFrames < data_size / num_per_frame_ ;  nFrames++)
 	{
 		frame_process(_data_in + nFrames * num_per_frame_, _data_out + nFrames * num_per_frame_);
+		std::cout << nFrames << std::endl;
 	}
 	//std::cout << "Pass";
 }
